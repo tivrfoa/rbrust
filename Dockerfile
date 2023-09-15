@@ -16,4 +16,6 @@ RUN cargo build --release
 
 EXPOSE 80
 
+# ENV RUST_BACKTRACE=FULL
+
 CMD ./target/release/rinha-backend-rust
