@@ -5,8 +5,8 @@ version: '3.5'
 services:
   api01: &api
     # image: distanteagle16/rinhabackend:latest
-    # image: rinha-rust:2
-    build: .
+    image: ubuntu-rust-rinha:1
+    # build: .
     environment:
       HTTP_PORT: 8080
       DB_HOST: localhost
@@ -41,7 +41,7 @@ services:
       resources:
         limits:
           cpus: '0.2'
-          memory: '0.5GB'
+          memory: '0.2GB'
 
   db: # Banco de dados
     image: postgres
@@ -55,14 +55,8 @@ services:
       - ./postgresql.conf:/docker-entrypoint-initdb.d/postgresql.conf
     command: postgres -c config_file=/docker-entrypoint-initdb.d/postgresql.conf
     network_mode: host
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 10s
     deploy:
       resources:
         limits:
           cpus: '0.9'
-          memory: '1.4GB'
+          memory: '1.7GB'
