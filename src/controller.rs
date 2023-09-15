@@ -1,5 +1,4 @@
 use crate::db::*;
-use crate::redis::*;
 use actix_web::{web, HttpResponse};
 use chrono::NaiveDate;
 use deadpool_postgres::Pool;
@@ -9,7 +8,7 @@ pub type APIResult = Result<HttpResponse, Box<dyn std::error::Error>>;
 
 #[actix_web::post("/pessoas")]
 pub async fn criar_pessoa(
-    redis_pool: web::Data<deadpool_redis::Pool>,
+    pool: web::Data<Pool>,
     payload: web::Json<CriarPessoaDTO>,
     queue: web::Data<Arc<AppQueue>>,
 ) -> APIResult {
@@ -18,15 +17,11 @@ pub async fn criar_pessoa(
         None => (),
     };
 
-    let redis_key = format!("a/{}", payload.apelido.clone());
-    match get_redis(&redis_pool, &redis_key).await {
-        Ok(_) => return Ok(HttpResponse::UnprocessableEntity().finish()),
-        Err(_) => (),
-    };
+    if is_apelido_present(&pool.get().await?, &payload.apelido).await? {
+        return Ok(HttpResponse::UnprocessableEntity().finish());
+    }
     let id = uuid::Uuid::new_v4().to_string();
-    let dto = create_dto_and_queue(payload, &id, queue.clone());
-    let body = serde_json::to_string(&dto)?;
-    let _ = set_redis(&redis_pool, &id, &body).await;
+    let _ = create_dto_and_queue(payload, &id, queue.clone());
 
     Ok(HttpResponse::Created()
         .append_header(("Location", format!("/pessoas/{id}")))
@@ -37,21 +32,10 @@ pub async fn criar_pessoa(
 pub async fn consultar_pessoa(
     id: web::Path<String>,
     pool: web::Data<Pool>,
-    redis_pool: web::Data<deadpool_redis::Pool>,
 ) -> APIResult {
     let id = id.to_string();
-    match get_redis(&redis_pool, &id).await {
-        Err(_) => (),
-        Ok(bytes) => return Ok(HttpResponse::Ok().body(bytes)),
-    };
     let dto = db_get_pessoa_dto(&pool.get().await?, &id).await?;
     let body = serde_json::to_string(&dto)?;
-    let body_async = body.clone();
-    // tokio::spawn(async move
-    {
-        let _ = set_redis(&redis_pool, &id, &body_async).await;
-    }
-    // );
     Ok(HttpResponse::Ok().body(body))
 }
 

@@ -1,14 +1,11 @@
 use actix_web::{http::KeepAlive, web, App, HttpServer};
-use deadpool_postgres::{Config, PoolConfig, Runtime, Timeouts};
-use deadpool_redis::{ConnectionAddr, ConnectionInfo, RedisConnectionInfo};
+use deadpool_postgres::{Config, PoolConfig, Runtime};
 use std::env;
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc};
 use tokio_postgres::NoTls;
 
 mod db;
 use db::*;
-
-mod redis;
 
 mod controller;
 use controller::*;
@@ -39,28 +36,6 @@ async fn main() -> AsyncVoidResult {
     let pool = cfg.create_pool(Some(Runtime::Tokio1), NoTls)?;
     println!("postgres pool succesfully created");
 
-    let mut cfg = deadpool_redis::Config::default();
-    let redis_host = env::var("REDIS_HOST").unwrap_or("0.0.0.0".into());
-    cfg.connection = Some(ConnectionInfo {
-        addr: ConnectionAddr::Tcp(redis_host, 6379),
-        redis: RedisConnectionInfo {
-            db: 0,
-            username: None,
-            password: None,
-        },
-    });
-    cfg.pool = Some(PoolConfig {
-        max_size: 9995,
-        timeouts: Timeouts {
-            wait: Some(Duration::from_secs(60)),
-            create: Some(Duration::from_secs(60)),
-            recycle: Some(Duration::from_secs(60)),
-        },
-    });
-    println!("creating redis pool...");
-    let redis_pool = cfg.create_pool(Some(Runtime::Tokio1))?;
-    println!("redis pool succesfully created");
-
     tokio::spawn(async move { db_warmup().await });
 
     let pool_async = pool.clone();
@@ -71,12 +46,11 @@ async fn main() -> AsyncVoidResult {
     let queue_async = queue.clone();
     tokio::spawn(async move { db_flush_queue(pool_async, queue_async).await });
 
-    let http_port = env::var("HTTP_PORT").unwrap_or("80".into());
+    let http_port = env::var("HTTP_PORT").unwrap_or("8080".into());
 
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))
-            .app_data(web::Data::new(redis_pool.clone()))
             .app_data(web::Data::new(queue.clone()))
             .service(criar_pessoa)
             .service(consultar_pessoa)

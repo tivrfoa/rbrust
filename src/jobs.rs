@@ -36,7 +36,7 @@ pub async fn db_warmup() {
         }
     }
     futures::future::join_all(f).await;
-    println!("warmup finished");
+    println!("warmup finished!");
 }
 
 pub async fn db_flush_queue(pool_async: Pool, queue_async: Arc<AppQueue>) {

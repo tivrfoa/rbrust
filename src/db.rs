@@ -78,6 +78,23 @@ pub async fn db_search(
     Ok(result)
 }
 
+pub async fn is_apelido_present(
+    conn: &deadpool_postgres::Client,
+    apelido: &String,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    let stmt = conn
+        .prepare_cached(
+            "
+            SELECT ID
+            FROM PESSOAS P
+            WHERE P.APELIDO = $1;
+        ",
+        )
+        .await?;
+    let rows = conn.query(&stmt, &[apelido]).await?;
+    Ok(!rows.is_empty())
+}
+
 pub async fn db_get_pessoa_dto(
     conn: &deadpool_postgres::Client,
     id: &String,
@@ -145,7 +162,11 @@ pub async fn batch_insert(pool: Pool, queue: Arc<AppQueue>) {
         };
         match transaction.batch_execute(&sql).await {
             Ok(_) => (),
-            Err(_) => return,
+            Err(e) => {
+                eprintln!("{:?}", e);
+                println!("{:?}", e);
+                return;
+            },
         };
         let _ = transaction.commit().await;
     }

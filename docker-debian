@@ -1,0 +1,9 @@
+FROM debian:buster-slim
+
+WORKDIR /actix
+
+COPY ./target/release/rinha-backend-rust rinha-backend-rust
+
+EXPOSE 80
+
+CMD ./rinha-backend-rust
