@@ -36,10 +36,11 @@ async fn main() -> AsyncVoidResult {
     let pool = cfg.create_pool(Some(Runtime::Tokio1), NoTls)?;
     println!("postgres pool succesfully created");
 
-    tokio::spawn(async move { db_warmup().await });
-
     let pool_async = pool.clone();
-    tokio::spawn(async move { db_clean_warmup(pool_async).await });
+    tokio::spawn(async move {
+        db_warmup().await;
+        db_clean_warmup(pool_async).await
+    });
 
     let pool_async = pool.clone();
     let queue = Arc::new(AppQueue::new());
