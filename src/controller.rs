@@ -2,7 +2,6 @@ use crate::db::*;
 use actix_web::{web, HttpResponse};
 use chrono::NaiveDate;
 use deadpool_postgres::Pool;
-use std::{sync::Arc, time::Duration};
 
 pub type APIResult = Result<HttpResponse, Box<dyn std::error::Error>>;
 
@@ -10,18 +9,17 @@ pub type APIResult = Result<HttpResponse, Box<dyn std::error::Error>>;
 pub async fn criar_pessoa(
     pool: web::Data<Pool>,
     payload: web::Json<CriarPessoaDTO>,
-    queue: web::Data<Arc<AppQueue>>,
 ) -> APIResult {
     match validate_payload(&payload) {
         Some(response) => return Ok(response),
         None => (),
     };
 
-    if is_apelido_present(&pool.get().await?, &payload.apelido).await? {
+    let id = uuid::Uuid::new_v4().to_string();
+    let pool = pool.clone();
+    if insert(pool.get().await?, &id, payload).await == 0 {
         return Ok(HttpResponse::UnprocessableEntity().finish());
     }
-    let id = uuid::Uuid::new_v4().to_string();
-    let _ = create_dto_and_queue(payload, &id, queue.clone());
 
     Ok(HttpResponse::Created()
         .append_header(("Location", format!("/pessoas/{id}")))
@@ -52,7 +50,6 @@ pub async fn buscar_pessoas(
 
 #[actix_web::get("/contagem-pessoas")]
 pub async fn contar_pessoas(pool: web::Data<Pool>) -> APIResult {
-    tokio::time::sleep(Duration::from_secs(3)).await;
     let count: i64 = db_count(&pool.get().await?).await?;
     Ok(HttpResponse::Ok().body(count.to_string()))
 }
@@ -77,28 +74,4 @@ fn validate_payload(payload: &CriarPessoaDTO) -> Option<HttpResponse> {
         }
     }
     return None;
-}
-
-fn create_dto_and_queue(
-    payload: web::Json<CriarPessoaDTO>,
-    id: &String,
-    queue: web::Data<Arc<AppQueue>>,
-) -> PessoaDTO {
-    let stack = match &payload.stack {
-        Some(v) => Some(v.join(" ")),
-        None => None,
-    };
-    let apelido = payload.apelido.clone();
-    let nome = payload.nome.clone();
-    let nascimento = payload.nascimento.clone();
-    let stack_vec = payload.stack.clone();
-    let dto = PessoaDTO {
-        id: id.clone(),
-        apelido,
-        nome,
-        nascimento,
-        stack: stack_vec,
-    };
-    queue.push((id.clone(), payload, stack));
-    return dto;
 }

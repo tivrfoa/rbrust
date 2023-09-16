@@ -1,13 +1,9 @@
 use actix_web::web;
-use deadpool_postgres::{GenericClient, Pool};
+use deadpool_postgres::{GenericClient};
 use serde::{Deserialize, Serialize};
-use sql_builder::{quote, SqlBuilder};
-use std::{collections::HashSet, sync::Arc};
 use tokio_postgres::Row;
 
 pub type AsyncVoidResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
-pub type QueueEvent = (String, web::Json<CriarPessoaDTO>, Option<String>);
-pub type AppQueue = deadqueue::unlimited::Queue<QueueEvent>;
 
 #[derive(Deserialize)]
 pub struct CriarPessoaDTO {
@@ -78,23 +74,6 @@ pub async fn db_search(
     Ok(result)
 }
 
-pub async fn is_apelido_present(
-    conn: &deadpool_postgres::Client,
-    apelido: &String,
-) -> Result<bool, Box<dyn std::error::Error>> {
-    let stmt = conn
-        .prepare_cached(
-            "
-            SELECT ID
-            FROM PESSOAS P
-            WHERE P.APELIDO = $1;
-        ",
-        )
-        .await?;
-    let rows = conn.query(&stmt, &[apelido]).await?;
-    Ok(!rows.is_empty())
-}
-
 pub async fn db_get_pessoa_dto(
     conn: &deadpool_postgres::Client,
     id: &String,
@@ -120,54 +99,35 @@ pub struct ParametrosBusca {
     pub t: String,
 }
 
-pub async fn batch_insert(pool: Pool, queue: Arc<AppQueue>) {
-    let mut apelidos = HashSet::<String>::new();
-    let mut sql = String::new();
-    while queue.len() > 0 {
-        let (id, payload, stack) = queue.pop().await;
-        if apelidos.contains(&payload.apelido) {
-            continue;
-        }
-        apelidos.insert(payload.apelido.clone());
-        let mut sql_builder = SqlBuilder::insert_into("PESSOAS");
-        sql_builder
-            .field("ID")
-            .field("APELIDO")
-            .field("NOME")
-            .field("NASCIMENTO")
-            .field("STACK");
-        sql_builder.values(&[
-            &quote(id),
-            &quote(&payload.apelido),
-            &quote(&payload.nome),
-            &quote(&payload.nascimento),
-            &quote(stack.unwrap_or("".into())),
-        ]);
-        let mut this_sql = match sql_builder.sql() {
-            Ok(x) => x,
-            Err(_) => continue,
-        };
-        this_sql.pop();
-        this_sql.push_str("ON CONFLICT DO NOTHING;");
-        sql.push_str(&this_sql.as_str());
+/*
+    https://docs.rs/tokio-postgres/0.7.7/src/tokio_postgres/error/sqlstate.rs.html#594
+    /// 23505
+    pub const UNIQUE_VIOLATION: SqlState = SqlState(Inner::E23505);
+*/
+
+pub async fn insert(mut conn: deadpool_postgres::Client, id: &String, payload: web::Json<CriarPessoaDTO>)
+        -> u8 {
+    let stack = match &payload.stack {
+        Some(v) => v.join(" "),
+        None => "".to_string(),
+    };
+
+    let sql = "INSERT INTO pessoas values ($1, $2, $3, $4, $5)";
+    let statement = conn.prepare(sql).await.unwrap();
+
+    let transaction = match conn.transaction().await {
+        Ok(x) => x,
+        Err(e) => {
+            panic!("conn.transaction() error: {:?}", e);
+        },
+    };
+    if let Err(_) = transaction.execute(&statement, &[id, &payload.apelido, &payload.nome, &payload.nascimento, &stack]).await {
+        /*if *e.code().unwrap() == tokio_postgres::error::SqlState::UNIQUE_VIOLATION {
+            println!("Duplicate apelido!!!");
+            return 0;
+        }*/
+        return 0;
     }
-    {
-        let mut conn = match pool.get().await {
-            Ok(x) => x,
-            Err(_) => return,
-        };
-        let transaction = match conn.transaction().await {
-            Ok(x) => x,
-            Err(_) => return,
-        };
-        match transaction.batch_execute(&sql).await {
-            Ok(_) => (),
-            Err(e) => {
-                eprintln!("{:?}", e);
-                println!("{:?}", e);
-                return;
-            },
-        };
-        let _ = transaction.commit().await;
-    }
+    let _ = transaction.commit().await;
+    1
 }

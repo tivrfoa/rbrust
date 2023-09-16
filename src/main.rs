@@ -1,7 +1,6 @@
 use actix_web::{http::KeepAlive, web, App, HttpServer};
 use deadpool_postgres::{Config, PoolConfig, Runtime};
 use std::env;
-use std::{sync::Arc};
 use tokio_postgres::NoTls;
 
 mod db;
@@ -9,9 +8,6 @@ use db::*;
 
 mod controller;
 use controller::*;
-
-mod jobs;
-use jobs::*;
 
 #[tokio::main]
 async fn main() -> AsyncVoidResult {
@@ -36,23 +32,12 @@ async fn main() -> AsyncVoidResult {
     let pool = cfg.create_pool(Some(Runtime::Tokio1), NoTls)?;
     println!("postgres pool succesfully created");
 
-    let pool_async = pool.clone();
-    tokio::spawn(async move {
-        db_warmup().await;
-        db_clean_warmup(pool_async).await
-    });
-
-    let pool_async = pool.clone();
-    let queue = Arc::new(AppQueue::new());
-    let queue_async = queue.clone();
-    tokio::spawn(async move { db_flush_queue(pool_async, queue_async).await });
-
     let http_port = env::var("HTTP_PORT").unwrap_or("8080".into());
+    println!("Running at port: {http_port}");
 
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))
-            .app_data(web::Data::new(queue.clone()))
             .service(criar_pessoa)
             .service(consultar_pessoa)
             .service(buscar_pessoas)
