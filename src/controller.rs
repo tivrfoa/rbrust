@@ -10,8 +10,8 @@ pub async fn criar_pessoa(
     pool: web::Data<Pool>,
     payload: web::Json<CriarPessoaDTO>,
 ) -> APIResult {
-    if let Some(response) = validate_payload(&payload) {
-        return Ok(response);
+    if !is_valid_payload(&payload) {
+        return Ok(HttpResponse::BadRequest().finish());
     }
 
     let id = uuid::Uuid::new_v4().to_string();
@@ -62,22 +62,20 @@ pub async fn contar_pessoas(pool: web::Data<Pool>) -> APIResult {
 
 // HELPER FUNCTIONS
 
-fn validate_payload(payload: &CriarPessoaDTO) -> Option<HttpResponse> {
-    if payload.nome.len() > 100 {
-        return Some(HttpResponse::BadRequest().finish());
+fn is_valid_payload(payload: &CriarPessoaDTO) -> bool {
+    if payload.nome.len() > 100 || payload.apelido.len() > 32 {
+        return false;
     }
-    if payload.apelido.len() > 32 {
-        return Some(HttpResponse::BadRequest().finish());
-    }
+
     if NaiveDate::parse_from_str(&payload.nascimento, "%Y-%m-%d").is_err() {
-        return Some(HttpResponse::BadRequest().finish());
+        return false;
     }
     if let Some(stack) = &payload.stack {
         for element in stack.iter() {
             if element.len() > 32 {
-                return Some(HttpResponse::BadRequest().finish());
+                return false;
             }
         }
     }
-    return None;
+	true
 }

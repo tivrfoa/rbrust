@@ -41,21 +41,19 @@ impl PessoaDTO {
 }
 
 pub async fn db_count(conn: &deadpool_postgres::Client) -> Result<i64, Box<dyn std::error::Error>> {
-    let rows = conn
-        .query(
-            "SELECT COUNT(1) FROM PESSOAS WHERE APELIDO NOT LIKE 'WARMUP%';",
+    let row = conn
+        .query_one(
+            "SELECT COUNT(*) FROM PESSOAS;",
             &[],
         )
         .await?;
-    let count: i64 = rows[0].get(0);
-    Ok(count)
+    Ok(row.get(0))
 }
 
 pub async fn db_search(
     conn: &deadpool_postgres::Client,
     t: String,
 ) -> Result<Vec<PessoaDTO>, Box<dyn std::error::Error>> {
-    let t = format!("%{}%", t.to_lowercase());
     let stmt = conn
         .prepare_cached(
             "
