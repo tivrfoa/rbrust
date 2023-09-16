@@ -77,21 +77,18 @@ pub async fn db_search(
 pub async fn db_get_pessoa_dto(
     conn: &deadpool_postgres::Client,
     id: &String,
-) -> Result<Option<PessoaDTO>, Box<dyn std::error::Error>> {
-    let rows = conn
-        .query(
+) -> Option<PessoaDTO> {
+    match conn.query_one(
             "
             SELECT ID, APELIDO, NOME, NASCIMENTO, STACK
             FROM PESSOAS P
             WHERE P.ID = $1;
         ",
             &[&id],
-        )
-        .await?;
-    if rows.len() == 0 {
-        return Ok(None);
+        ).await {
+        Ok(row) => Some(PessoaDTO::from(&row)),
+        Err(_) => None,
     }
-    Ok(Some(PessoaDTO::from(&rows[0])))
 }
 
 #[derive(Deserialize)]

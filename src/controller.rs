@@ -10,10 +10,9 @@ pub async fn criar_pessoa(
     pool: web::Data<Pool>,
     payload: web::Json<CriarPessoaDTO>,
 ) -> APIResult {
-    match validate_payload(&payload) {
-        Some(response) => return Ok(response),
-        None => (),
-    };
+    if let Some(response) = validate_payload(&payload) {
+        return Ok(response);
+    }
 
     let id = uuid::Uuid::new_v4().to_string();
     if insert(&pool.get().await?, &id, payload).await == 0 {
@@ -31,9 +30,14 @@ pub async fn consultar_pessoa(
     pool: web::Data<Pool>,
 ) -> APIResult {
     let id = id.to_string();
-    let dto = db_get_pessoa_dto(&pool.get().await?, &id).await?;
-    let body = serde_json::to_string(&dto)?;
-    Ok(HttpResponse::Ok().body(body))
+    match db_get_pessoa_dto(&pool.get().await?, &id).await {
+        Some(dto) => {
+            let body = serde_json::to_string(&dto)?;
+            Ok(HttpResponse::Ok().body(body))
+        },
+        None => Ok(HttpResponse::NotFound().finish()),
+    }
+    
 }
 
 #[actix_web::get("/pessoas")]
@@ -41,7 +45,10 @@ pub async fn buscar_pessoas(
     parametros: web::Query<ParametrosBusca>,
     pool: web::Data<Pool>,
 ) -> APIResult {
-    let t = format!("%{}%", parametros.t.to_lowercase());
+    let mut t = String::with_capacity(parametros.t.len() + 2);
+    t.push('%');
+    t.push_str(&parametros.t.to_lowercase());
+    t.push('%');
     let result = db_search(&pool.get().await?, t).await?;
     let body = serde_json::to_string(&result)?;
     Ok(HttpResponse::Ok().body(body))
@@ -66,7 +73,7 @@ fn validate_payload(payload: &CriarPessoaDTO) -> Option<HttpResponse> {
         return Some(HttpResponse::BadRequest().finish());
     }
     if let Some(stack) = &payload.stack {
-        for element in stack.clone() {
+        for element in stack.iter() {
             if element.len() > 32 {
                 return Some(HttpResponse::BadRequest().finish());
             }
