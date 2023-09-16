@@ -5,7 +5,7 @@ version: '3.5'
 services:
   api01: &api
     # image: distanteagle16/rinhabackend:latest
-    image: ubuntu-rust-rinha:1
+    image: ubuntu-rust-rinha:batchinsert
     # build: .
     environment:
       HTTP_PORT: 8080
@@ -17,8 +17,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.2'
-          memory: '0.55GB'
+          cpus: '0.15'
+          memory: '0.5GB'
     network_mode: "host"
 
   api02:
@@ -58,5 +58,5 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.9'
-          memory: '1.7GB'
+          cpus: '1'
+          memory: '1.8GB'

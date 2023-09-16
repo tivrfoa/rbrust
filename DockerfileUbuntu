@@ -2,10 +2,10 @@ FROM ubuntu:22.04
 
 WORKDIR /actix
 
-ENV RUST_BACKTRACE=FULL
+# ENV RUST_BACKTRACE=FULL
 
-# COPY ./target/release/rinha-backend-rust rinha-backend-rust
-COPY ./target/debug/rinha-backend-rust rinha-backend-rust
+COPY ./target/release/rinha-backend-rust rinha-backend-rust
+# COPY ./target/debug/rinha-backend-rust rinha-backend-rust
 
 EXPOSE 8080
 
