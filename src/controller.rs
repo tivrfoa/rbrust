@@ -16,8 +16,7 @@ pub async fn criar_pessoa(
     };
 
     let id = uuid::Uuid::new_v4().to_string();
-    let pool = pool.clone();
-    if insert(pool.get().await?, &id, payload).await == 0 {
+    if insert(&pool.get().await?, &id, payload).await == 0 {
         return Ok(HttpResponse::UnprocessableEntity().finish());
     }
 

@@ -105,7 +105,7 @@ pub struct ParametrosBusca {
     pub const UNIQUE_VIOLATION: SqlState = SqlState(Inner::E23505);
 */
 
-pub async fn insert(mut conn: deadpool_postgres::Client, id: &String, payload: web::Json<CriarPessoaDTO>)
+pub async fn insert(conn: &deadpool_postgres::Client, id: &String, payload: web::Json<CriarPessoaDTO>)
         -> u8 {
     let stack = match &payload.stack {
         Some(v) => v.join(" "),
@@ -114,20 +114,13 @@ pub async fn insert(mut conn: deadpool_postgres::Client, id: &String, payload: w
 
     let sql = "INSERT INTO pessoas values ($1, $2, $3, $4, $5)";
     let statement = conn.prepare(sql).await.unwrap();
-
-    let transaction = match conn.transaction().await {
-        Ok(x) => x,
-        Err(e) => {
-            panic!("conn.transaction() error: {:?}", e);
-        },
-    };
-    if let Err(_) = transaction.execute(&statement, &[id, &payload.apelido, &payload.nome, &payload.nascimento, &stack]).await {
+    if let Err(_) = conn.execute(&statement, &[id, &payload.apelido, &payload.nome, &payload.nascimento, &stack]).await {
         /*if *e.code().unwrap() == tokio_postgres::error::SqlState::UNIQUE_VIOLATION {
             println!("Duplicate apelido!!!");
             return 0;
         }*/
         return 0;
     }
-    let _ = transaction.commit().await;
+
     1
 }
