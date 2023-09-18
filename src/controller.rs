@@ -86,7 +86,7 @@ fn validate_payload(payload: &CriarPessoaDTO) -> Option<HttpResponse> {
         return Some(HttpResponse::BadRequest().finish());
     }
     if let Some(stack) = &payload.stack {
-        for element in stack.clone() {
+        for element in stack {
             if element.len() > 32 {
                 return Some(HttpResponse::BadRequest().finish());
             }
