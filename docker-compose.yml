@@ -3,7 +3,8 @@ version: '3.5'
 services:
   api01: &api
     # image: distanteagle16/rinhabackend:latest
-    build: .
+    # build: .
+    image: actixweb:originalubuntu
     environment:
       HTTP_PORT: 8080
       DB_HOST: localhost
