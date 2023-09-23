@@ -43,7 +43,7 @@ services:
           memory: '0.5GB'
 
   db: # Banco de dados
-    image: postgres
+    image: postgres:16.0-bullseye
     hostname: db
     environment:
       POSTGRES_USER: root
